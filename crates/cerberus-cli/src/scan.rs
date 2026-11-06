@@ -1,18 +1,23 @@
 //! Multi-process scan orchestration.
 
+use cerberus_core::errors::MemoryReaderError;
 use cerberus_core::reader::ProcessMemoryReader;
 use cerberus_detect::fileless::check_fileless_execution;
 use cerberus_detect::got_poison::inspect_process_got_with_context;
 use cerberus_detect::hollowing::inspect_process_hollowing_with_context;
 use cerberus_detect::inline_hook::inspect_inline_hooks_with_context;
 use cerberus_detect::wxorx::scan_vma_anomalies;
-use cerberus_procfs::maps::read_process_maps;
+use cerberus_procfs::maps::{read_process_maps, VmaProtection, VmaRecord};
 use cerberus_procfs::process::enumerate_all_pids;
+use cerberus_procfs::snapshot::address_space_replaced;
 use cerberus_procfs::status::ProcessMetadata;
 use cerberus_report::models::ForensicFinding;
 use cerberus_report::quarantine::QuarantineDumper;
 use rayon::prelude::*;
 use std::path::PathBuf;
+
+/// Attempts made to obtain a consistent snapshot of one process.
+const SNAPSHOT_RETRIES: usize = 2;
 
 /// Configuration for one scan invocation.
 #[derive(Debug, Clone, Default)]
@@ -23,34 +28,58 @@ pub struct ScanConfig {
     pub all: bool,
     /// Optional quarantine directory for divergent byte ranges.
     pub quarantine_dir: Option<PathBuf>,
+    /// Maximum number of scanner worker threads.
+    ///
+    /// `None` uses every available core. Daemon mode should prefer a lower
+    /// value so continuous sweeps do not saturate a production host.
+    pub max_threads: Option<usize>,
 }
 
 /// Scan one process with every detection engine.
+///
+/// A target that calls `execve(2)` while being inspected replaces its entire
+/// address space, so the maps snapshot and the memory sample can describe
+/// different layouts. Such a torn snapshot is retried against a fresh read
+/// instead of being reported as a threat.
 pub fn scan_process(
     pid: i32,
     reader: &dyn ProcessMemoryReader,
     config: &ScanConfig,
 ) -> Vec<ForensicFinding> {
-    let meta = match ProcessMetadata::extract(pid) {
-        Ok(meta) => meta,
-        Err(_) => return Vec::new(),
-    };
-    let vmas = match read_process_maps(pid) {
-        Ok(vmas) => vmas,
-        Err(_) => return Vec::new(),
-    };
+    for attempt in 0..SNAPSHOT_RETRIES {
+        let meta = match ProcessMetadata::extract(pid) {
+            Ok(meta) => meta,
+            Err(_) => return Vec::new(),
+        };
+        let vmas = match read_process_maps(pid) {
+            Ok(vmas) => vmas,
+            Err(_) => return Vec::new(),
+        };
 
-    let mut findings = Vec::new();
-    findings.extend(check_fileless_execution(&meta, &vmas));
-    findings.extend(scan_vma_anomalies(&meta, &vmas));
-    findings.extend(inspect_process_hollowing_with_context(
-        pid, &meta, &vmas, reader,
-    ));
-    findings.extend(inspect_process_got_with_context(pid, &meta, &vmas, reader));
-    findings.extend(inspect_inline_hooks_with_context(pid, &meta, &vmas, reader));
+        let mut findings = Vec::new();
+        findings.extend(check_fileless_execution(&meta, &vmas));
+        findings.extend(scan_vma_anomalies(&meta, &vmas));
 
-    quarantine_artifacts(config, &findings);
-    findings
+        // Memory-backed engines need a readable target. Probe once so
+        // unprivileged sweeps do not parse every on-disk executable before the
+        // kernel refuses the first read.
+        if !memory_access_denied(pid, &vmas, reader) {
+            findings.extend(inspect_process_hollowing_with_context(
+                pid, &meta, &vmas, reader,
+            ));
+            findings.extend(inspect_process_got_with_context(pid, &meta, &vmas, reader));
+            findings.extend(inspect_inline_hooks_with_context(pid, &meta, &vmas, reader));
+        }
+
+        if attempt + 1 < SNAPSHOT_RETRIES && address_space_replaced(pid, &meta, &vmas) {
+            continue;
+        }
+
+        quarantine_artifacts(config, &findings);
+        return findings;
+    }
+
+    Vec::new()
 }
 
 /// Scan every host process in parallel.
@@ -60,16 +89,34 @@ pub fn sweep_host(reader: &dyn ProcessMemoryReader, config: &ScanConfig) -> Vec<
         Err(_) => return Vec::new(),
     };
 
-    let mut findings: Vec<ForensicFinding> = pids
-        .into_par_iter()
-        .flat_map(|pid| scan_process(pid, reader, config))
-        .collect();
+    let findings: Vec<ForensicFinding> = match config.max_threads {
+        Some(threads) => {
+            let pool = match rayon::ThreadPoolBuilder::new()
+                .num_threads(threads.max(1))
+                .build()
+            {
+                Ok(pool) => pool,
+                Err(_) => return Vec::new(),
+            };
+            pool.install(|| {
+                pids.into_par_iter()
+                    .flat_map(|pid| scan_process(pid, reader, config))
+                    .collect()
+            })
+        }
+        None => pids
+            .into_par_iter()
+            .flat_map(|pid| scan_process(pid, reader, config))
+            .collect(),
+    };
 
+    let mut findings = findings;
     findings.sort_by(|left, right| {
         left.target_pid
             .cmp(&right.target_pid)
             .then_with(|| left.anomaly_type.cmp(&right.anomaly_type))
     });
+
     findings
 }
 
@@ -84,6 +131,28 @@ pub fn scan_targets(reader: &dyn ProcessMemoryReader, config: &ScanConfig) -> Ve
         sweep_host(reader, config)
     } else {
         Vec::new()
+    }
+}
+
+/// Whether the kernel denies memory access to the target process.
+///
+/// Only an explicit access denial (`EPERM` / `EACCES`) or a vanished target
+/// suppresses the memory-backed detectors. Transient faults such as `EFAULT`
+/// are treated as "accessible" so a single unmapped probe address never hides
+/// a real finding.
+fn memory_access_denied(pid: i32, vmas: &[VmaRecord], reader: &dyn ProcessMemoryReader) -> bool {
+    let Some(vma) = vmas
+        .iter()
+        .find(|vma| vma.perms.contains(VmaProtection::READ))
+    else {
+        return true;
+    };
+    let mut probe = [0u8; 1];
+    match reader.read_memory(pid, vma.start, &mut probe) {
+        Ok(_) => false,
+        Err(MemoryReaderError::PermissionDenied { .. })
+        | Err(MemoryReaderError::ProcessNotFound { .. }) => true,
+        Err(_) => false,
     }
 }
 
