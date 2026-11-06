@@ -1,0 +1,25 @@
+[package]
+name = "cerberus-cli"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[[bin]]
+name = "cerberus-mem"
+path = "src/main.rs"
+
+[dependencies]
+cerberus-core = { path = "../cerberus-core" }
+cerberus-detect = { path = "../cerberus-detect" }
+cerberus-elf = { path = "../cerberus-elf" }
+cerberus-procfs = { path = "../cerberus-procfs" }
+cerberus-report = { path = "../cerberus-report" }
+clap.workspace = true
+env_logger.workspace = true
+libc.workspace = true
+log.workspace = true
+rayon.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true

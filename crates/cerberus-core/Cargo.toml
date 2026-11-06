@@ -1,0 +1,10 @@
+[package]
+name = "cerberus-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+libc.workspace = true
+thiserror.workspace = true

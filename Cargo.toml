@@ -1,0 +1,31 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/cerberus-core",
+    "crates/cerberus-procfs",
+    "crates/cerberus-elf",
+    "crates/cerberus-detect",
+    "crates/cerberus-report",
+    "crates/cerberus-cli",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Dev Team <dev@local>"]
+license = "Apache-2.0"
+
+[workspace.dependencies]
+libc = "0.2.158"
+bitflags = "2.6.0"
+thiserror = "1.0.63"
+serde = { version = "1.0.209", features = ["derive"] }
+serde_json = "1.0.128"
+goblin = "0.8.2"
+rayon = "1.10.0"
+clap = { version = "4.5.17", features = ["derive"] }
+sha2 = "0.10.8"
+log = "0.4.22"
+env_logger = "0.11.5"
+iced-x86 = { version = "1.21.0", default-features = false, features = ["decoder", "no_std"] }
+chrono = "0.4.38"

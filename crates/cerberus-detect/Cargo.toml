@@ -1,0 +1,17 @@
+[package]
+name = "cerberus-detect"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+cerberus-core = { path = "../cerberus-core" }
+cerberus-elf = { path = "../cerberus-elf" }
+cerberus-procfs = { path = "../cerberus-procfs" }
+cerberus-report = { path = "../cerberus-report" }
+chrono.workspace = true
+iced-x86.workspace = true
+libc.workspace = true
+sha2.workspace = true
+thiserror.workspace = true
