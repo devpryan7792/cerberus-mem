@@ -10,6 +10,9 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 
+/// Upper bound on scanner threads used by daemon mode.
+const DAEMON_MAX_THREADS: usize = 4;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "cerberus-mem",
@@ -40,10 +43,25 @@ struct Cli {
     /// Quarantine directory for extracted divergent bytes.
     #[arg(long)]
     quarantine_dir: Option<PathBuf>,
+
+    /// Maximum scanner worker threads.
+    ///
+    /// Defaults to every available core. Daemon mode caps this at 4 unless the
+    /// value is given explicitly, so continuous sweeps do not saturate a
+    /// production host.
+    #[arg(long, value_name = "N")]
+    max_threads: Option<usize>,
 }
 
 fn main() {
-    env_logger::init();
+    // Default to `warn` so operational diagnostics (such as YAMA restrictions)
+    // are visible without requiring RUST_LOG, while still honoring an
+    // explicit override from the environment.
+    if std::env::var_os("RUST_LOG").is_none() {
+        env_logger::Builder::from_env(env_logger::Env::default().filter_or("warn", "warn")).init();
+    } else {
+        env_logger::init();
+    }
     let cli = Cli::parse();
 
     if let Err(err) = run(cli) {
@@ -57,19 +75,24 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         return Err("specify --pid <PID>, --all, or --daemon".into());
     }
 
+    report_yama_scope();
+
     let reader = FallbackReader::new();
+    let max_threads = resolve_max_threads(cli.max_threads, cli.daemon);
     let config = ScanConfig {
         pid: cli.pid,
         // Daemon mode without an explicit target sweeps the host, matching the
         // documented `--daemon --interval N --quarantine-dir DIR` invocation.
         all: cli.all || (cli.daemon && cli.pid.is_none()),
         quarantine_dir: cli.quarantine_dir,
+        max_threads,
     };
 
     if cli.daemon {
         loop {
             let findings = scan_targets(&reader, &config);
             emit_findings(&findings, cli.jsonl.as_deref())?;
+            eprintln!("cerberus-mem: {} finding(s)", findings.len());
             std::thread::sleep(Duration::from_secs(cli.interval.max(1)));
         }
     }
@@ -78,6 +101,30 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
     emit_findings(&findings, cli.jsonl.as_deref())?;
     eprintln!("cerberus-mem: {} finding(s)", findings.len());
     Ok(())
+}
+
+/// Resolve the worker-thread budget.
+///
+/// Daemon mode is capped so a continuous sweep leaves headroom for the host's
+/// own work; an explicit `--max-threads` always wins.
+fn resolve_max_threads(explicit: Option<usize>, daemon: bool) -> Option<usize> {
+    if let Some(threads) = explicit {
+        return Some(threads.max(1));
+    }
+    if !daemon {
+        return None;
+    }
+    let available = std::thread::available_parallelism()
+        .map(|value| value.get())
+        .unwrap_or(4);
+    Some(available.min(DAEMON_MAX_THREADS))
+}
+
+/// Warn when YAMA prevents inspection of foreign processes.
+fn report_yama_scope() {
+    if let Some(diagnostic) = cerberus_procfs::yama::foreign_inspection_diagnostic() {
+        log::warn!("{diagnostic}");
+    }
 }
 
 fn emit_findings(

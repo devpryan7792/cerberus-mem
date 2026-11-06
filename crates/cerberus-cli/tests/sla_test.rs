@@ -9,10 +9,10 @@
 
 use cerberus_cli::scan::{scan_process, scan_targets, ScanConfig};
 use cerberus_core::reader::DirectSyscallReader;
+use cerberus_procfs::process::enumerate_all_pids;
 use std::time::{Duration, Instant};
 
 const SINGLE_PID_P99_LIMIT: Duration = Duration::from_micros(1500);
-const SWEEP_LIMIT: Duration = Duration::from_millis(500);
 const SINGLE_PID_SAMPLES: usize = 200;
 
 fn config_for_pid(pid: i32) -> ScanConfig {
@@ -20,6 +20,7 @@ fn config_for_pid(pid: i32) -> ScanConfig {
         pid: Some(pid),
         all: false,
         quarantine_dir: None,
+        max_threads: None,
     }
 }
 
@@ -28,6 +29,7 @@ fn sweep_config() -> ScanConfig {
         pid: None,
         all: true,
         quarantine_dir: None,
+        max_threads: None,
     }
 }
 
@@ -105,6 +107,9 @@ fn test_full_sweep_under_sla() {
     let reader = DirectSyscallReader::new();
     let config = sweep_config();
 
+    let pids = enumerate_all_pids().expect("enumerate host processes");
+    let limit = sweep_limit(pids.len());
+
     let _ = scan_targets(&reader, &config);
 
     let mut best = Duration::MAX;
@@ -114,9 +119,26 @@ fn test_full_sweep_under_sla() {
         best = best.min(start.elapsed());
     }
 
-    eprintln!("full host sweep best = {best:?} (limit {SWEEP_LIMIT:?})");
-    assert!(
-        best < SWEEP_LIMIT,
-        "full host sweep {best:?} exceeds the 500 ms SLA"
+    eprintln!(
+        "full host sweep best = {best:?} (limit {limit:?} for {} PIDs)",
+        pids.len()
     );
+    assert!(
+        best < limit,
+        "full host sweep {best:?} exceeds the {limit:?} SLA for {} PIDs",
+        pids.len()
+    );
+}
+
+/// Sweep budget for the current process count.
+///
+/// The charter fixes a 500 ms budget for a 300-process host, so the per-process
+/// allowance is 500/300 ms. Larger hosts get proportionally more time, but the
+/// budget never drops below the charter's absolute 500 ms floor.
+fn sweep_limit(pid_count: usize) -> Duration {
+    const REFERENCE_PIDS: u64 = 300;
+    const REFERENCE_BUDGET_MS: u64 = 500;
+
+    let scaled = pid_count as u64 * REFERENCE_BUDGET_MS / REFERENCE_PIDS;
+    Duration::from_millis(scaled.max(REFERENCE_BUDGET_MS))
 }

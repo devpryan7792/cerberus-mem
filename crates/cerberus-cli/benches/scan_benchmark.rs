@@ -16,6 +16,7 @@ fn single_pid_config(pid: i32) -> ScanConfig {
         pid: Some(pid),
         all: false,
         quarantine_dir: None,
+        max_threads: None,
     }
 }
 
@@ -24,6 +25,7 @@ fn full_sweep_config() -> ScanConfig {
         pid: None,
         all: true,
         quarantine_dir: None,
+        max_threads: None,
     }
 }
 
