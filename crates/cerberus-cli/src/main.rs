@@ -55,14 +55,16 @@ fn main() {
 }
 
 fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
-    if cli.pid.is_none() && !cli.all {
-        return Err("specify either --pid <PID> or --all".into());
+    if cli.pid.is_none() && !cli.all && !cli.daemon {
+        return Err("specify --pid <PID>, --all, or --daemon".into());
     }
 
     let reader = DirectSyscallReader::new();
     let config = ScanConfig {
         pid: cli.pid,
-        all: cli.all,
+        // Daemon mode without an explicit target sweeps the host, matching the
+        // documented `--daemon --interval N --quarantine-dir DIR` invocation.
+        all: cli.all || (cli.daemon && cli.pid.is_none()),
         quarantine_dir: cli.quarantine_dir,
     };
 
