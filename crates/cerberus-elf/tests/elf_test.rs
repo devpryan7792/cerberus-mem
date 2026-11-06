@@ -65,6 +65,42 @@ fn test_relocation_mask_from_records_clamps() {
 }
 
 #[test]
+fn test_masked_eq_ignores_exempted_bytes() {
+    let mut mask = RelocationMask::new();
+    mask.add_interval(4, 8);
+
+    let left = [0u8; 16];
+    let mut right = [0u8; 16];
+    right[6] = 0xFF;
+    assert!(mask.masked_eq(&left, &right));
+
+    right[2] = 0xFF;
+    assert!(!mask.masked_eq(&left, &right));
+}
+
+#[test]
+fn test_masked_eq_handles_unsorted_overlapping_intervals() {
+    let mut mask = RelocationMask::new();
+    mask.add_interval(10, 4);
+    mask.add_interval(2, 8);
+    mask.add_interval(6, 8);
+
+    let left = [0u8; 20];
+    let mut right = [0u8; 20];
+    right[2..14].fill(0xFF);
+    assert!(mask.masked_eq(&left, &right));
+
+    right[15] = 0xFF;
+    assert!(!mask.masked_eq(&left, &right));
+}
+
+#[test]
+fn test_masked_eq_rejects_different_lengths() {
+    let mask = RelocationMask::new();
+    assert!(!mask.masked_eq(&[0u8; 4], &[0u8; 5]));
+}
+
+#[test]
 fn test_rejects_non_elf_input() {
     let path = std::env::temp_dir().join(format!(
         "cerberus-elf-not-elf-{}-{}",

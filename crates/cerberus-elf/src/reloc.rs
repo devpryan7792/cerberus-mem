@@ -61,6 +61,38 @@ impl RelocationMask {
         }
     }
 
+    /// Compare two buffers while ignoring exempted intervals.
+    ///
+    /// Both slices must start at the same segment offset. Intervals are
+    /// clamped to the compared length, and overlapping or unsorted intervals
+    /// are handled by merging them through a cursor.
+    pub fn masked_eq(&self, left: &[u8], right: &[u8]) -> bool {
+        if left.len() != right.len() {
+            return false;
+        }
+
+        let len = left.len();
+        let mut intervals: Vec<(usize, usize)> = self
+            .intervals
+            .iter()
+            .map(|interval| {
+                let start = interval.offset_in_segment.min(len);
+                let end = start.saturating_add(interval.length).min(len);
+                (start, end)
+            })
+            .collect();
+        intervals.sort_unstable();
+
+        let mut cursor = 0usize;
+        for (start, end) in intervals {
+            if start > cursor && left[cursor..start] != right[cursor..start] {
+                return false;
+            }
+            cursor = cursor.max(end);
+        }
+        left[cursor..] == right[cursor..]
+    }
+
     /// Whether the mask contains no intervals.
     pub fn is_empty(&self) -> bool {
         self.intervals.is_empty()

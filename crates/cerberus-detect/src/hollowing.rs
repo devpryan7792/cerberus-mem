@@ -81,17 +81,20 @@ pub fn inspect_process_hollowing_with_context(
         return Vec::new();
     }
 
-    let mut disk_bytes = disk.text.data.clone();
-    disk_bytes.truncate(read_len);
     memory.truncate(read_len);
 
     let mask = RelocationMask::from_relocations(&disk.relocations);
-    mask.apply_mask(&mut disk_bytes);
     mask.apply_mask(&mut memory);
 
     let mut findings = Vec::new();
 
-    if disk_bytes != memory {
+    // Compare against the shared disk image without cloning it. Only a real
+    // divergence needs a private, masked copy for hashing and extraction.
+    if !mask.masked_eq(&disk.text.data[..read_len], &memory) {
+        let mut disk_bytes = disk.text.data.clone();
+        disk_bytes.truncate(read_len);
+        mask.apply_mask(&mut disk_bytes);
+
         let first_diff = disk_bytes
             .iter()
             .zip(memory.iter())
