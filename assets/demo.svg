@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1180" height="470" viewBox="0 0 1180 470" role="img" aria-label="Cerberus-Mem terminal demo">
+  <defs>
+    <linearGradient id="win" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0c141c"/>
+      <stop offset="1" stop-color="#080d12"/>
+    </linearGradient>
+    <linearGradient id="bar" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#111c26"/>
+      <stop offset="1" stop-color="#0d1720"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1180" height="470" rx="14" fill="url(#win)" stroke="#1e2b38"/>
+  <path d="M0 14 A14 14 0 0 1 14 0 H1166 A14 14 0 0 1 1180 14 V46 H0 Z" fill="url(#bar)"/>
+  <line x1="0" y1="46" x2="1180" y2="46" stroke="#1e2b38"/>
+
+  <circle cx="24" cy="23" r="6" fill="#f87171" opacity="0.85"/>
+  <circle cx="44" cy="23" r="6" fill="#fbbf24" opacity="0.85"/>
+  <circle cx="64" cy="23" r="6" fill="#34d399" opacity="0.85"/>
+  <text x="590" y="28" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" fill="#64748b">cerberus-mem — live host sweep</text>
+
+  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="14" xml:space="preserve">
+    <text x="30" y="86" fill="#22d3ee">$</text>
+    <text x="48" y="86" fill="#e2e8f0">cerberus-mem --all</text>
+
+    <text x="30" y="120" fill="#f87171">[High]</text>
+    <text x="102" y="120" fill="#94a3b8">pid=1631  quickshell   WxorXViolation         0x7f0401a2e000-0x7f0401a3e000</text>
+
+    <text x="30" y="146" fill="#fbbf24">[Medium]</text>
+    <text x="102" y="146" fill="#94a3b8">pid=1631  quickshell   AnonymousExecutable    65536 bytes, anonymous</text>
+
+    <text x="30" y="172" fill="#f87171">[High]</text>
+    <text x="102" y="172" fill="#94a3b8">pid=1864  firefox      WxorXViolation         0x7febd4c51000-0x7febd4c72000</text>
+
+    <text x="30" y="198" fill="#fbbf24">[Medium]</text>
+    <text x="102" y="198" fill="#94a3b8">pid=2847  node         AnonymousExecutable    4096 bytes, JIT allowlisted</text>
+
+    <text x="30" y="224" fill="#475569">...</text>
+
+    <text x="30" y="252" fill="#34d399">cerberus-mem: 229 finding(s) · 316 processes · 114 ms</text>
+
+    <text x="30" y="300" fill="#22d3ee">$</text>
+    <text x="48" y="300" fill="#e2e8f0">cerberus-mem --pid 4821 --jsonl findings.jsonl</text>
+    <text x="520" y="300" fill="#475569"># synthetic lab target</text>
+
+    <text x="30" y="332" fill="#fb7185">[Critical]</text>
+    <text x="130" y="332" fill="#94a3b8">pid=4821  FilelessMemfdExecution  /memfd:payload (deleted)</text>
+
+    <text x="30" y="358" fill="#f87171">[High]</text>
+    <text x="102" y="358" fill="#94a3b8">pid=4821  GotPltHijack            connect -&gt; anonymous rwx</text>
+
+    <text x="30" y="384" fill="#f87171">[High]</text>
+    <text x="102" y="384" fill="#94a3b8">pid=4821  ProcessHollowing        .text divergence at 0x55d1...</text>
+
+    <text x="30" y="412" fill="#34d399">cerberus-mem: 3 finding(s)</text>
+  </g>
+
+  <line x1="30" y1="438" x2="1150" y2="438" stroke="#16212c"/>
+  <text x="30" y="457" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11" fill="#475569">JSON-Lines output · relocation-masked SHA-256 · quarantine with O_NOFOLLOW · process_vm_readv + /proc/[pid]/mem</text>
+</svg>
