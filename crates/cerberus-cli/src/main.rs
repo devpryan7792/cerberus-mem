@@ -1,12 +1,10 @@
 //! `cerberus-mem` command-line entry point.
 
-mod scan;
-
-use cerberus_core::reader::DirectSyscallReader;
+use cerberus_cli::scan::{scan_targets, ScanConfig};
+use cerberus_core::reader::FallbackReader;
 use cerberus_report::jsonl::JsonlEmitter;
 use cerberus_report::models::ForensicFinding;
 use clap::Parser;
-use scan::{scan_targets, ScanConfig};
 use std::fs::OpenOptions;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -59,7 +57,7 @@ fn run(cli: Cli) -> Result<(), Box<dyn std::error::Error>> {
         return Err("specify --pid <PID>, --all, or --daemon".into());
     }
 
-    let reader = DirectSyscallReader::new();
+    let reader = FallbackReader::new();
     let config = ScanConfig {
         pid: cli.pid,
         // Daemon mode without an explicit target sweeps the host, matching the

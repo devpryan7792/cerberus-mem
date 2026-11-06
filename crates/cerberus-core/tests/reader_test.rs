@@ -1,7 +1,9 @@
 #![cfg(not(miri))]
 
 use cerberus_core::errors::MemoryReaderError;
-use cerberus_core::reader::{DirectSyscallReader, ProcessMemoryReader};
+use cerberus_core::reader::{
+    DirectSyscallReader, FallbackReader, ProcMemReader, ProcessMemoryReader,
+};
 
 #[test]
 fn test_read_current_process_stack_memory() {
@@ -59,4 +61,49 @@ fn test_page_size_is_resolved() {
         reader.page_size().is_power_of_two(),
         "page size must be a power of two"
     );
+}
+
+#[test]
+fn test_proc_mem_reader_reads_current_process() {
+    let pid = std::process::id() as i32;
+    let reader = ProcMemReader::open(pid).expect("open /proc/self/mem");
+
+    let source = *b"proc-mem pread fallback verification payload";
+    let source = std::hint::black_box(source);
+    let mut out = vec![0u8; source.len()];
+
+    let bytes = reader
+        .read_exact_at(&mut out, source.as_ptr() as u64)
+        .expect("pread should succeed");
+    assert_eq!(bytes, source.len());
+    assert_eq!(out, source);
+}
+
+#[test]
+fn test_proc_mem_reader_zero_fills_unmapped() {
+    let pid = std::process::id() as i32;
+    let reader = ProcMemReader::open(pid).expect("open /proc/self/mem");
+
+    let mut out = [0xAAu8; 64];
+    let bytes = reader
+        .read_memory(pid, 0, &mut out)
+        .expect("unmapped read should degrade");
+    assert_eq!(bytes, 0);
+    assert!(out.iter().all(|&byte| byte == 0));
+}
+
+#[test]
+fn test_fallback_reader_reads_current_process() {
+    let pid = std::process::id() as i32;
+    let reader = FallbackReader::new();
+
+    let source = *b"fallback reader verification payload";
+    let source = std::hint::black_box(source);
+    let mut out = vec![0u8; source.len()];
+
+    let bytes = reader
+        .read_memory(pid, source.as_ptr() as u64, &mut out)
+        .expect("self read should succeed via process_vm_readv");
+    assert_eq!(bytes, source.len());
+    assert_eq!(out, source);
 }

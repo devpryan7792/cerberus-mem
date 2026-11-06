@@ -1,6 +1,6 @@
 //! Multi-process scan orchestration.
 
-use cerberus_core::reader::DirectSyscallReader;
+use cerberus_core::reader::ProcessMemoryReader;
 use cerberus_detect::fileless::check_fileless_execution;
 use cerberus_detect::got_poison::inspect_process_got_with_context;
 use cerberus_detect::hollowing::inspect_process_hollowing_with_context;
@@ -28,7 +28,7 @@ pub struct ScanConfig {
 /// Scan one process with every detection engine.
 pub fn scan_process(
     pid: i32,
-    reader: &DirectSyscallReader,
+    reader: &dyn ProcessMemoryReader,
     config: &ScanConfig,
 ) -> Vec<ForensicFinding> {
     let meta = match ProcessMetadata::extract(pid) {
@@ -54,7 +54,7 @@ pub fn scan_process(
 }
 
 /// Scan every host process in parallel.
-pub fn sweep_host(reader: &DirectSyscallReader, config: &ScanConfig) -> Vec<ForensicFinding> {
+pub fn sweep_host(reader: &dyn ProcessMemoryReader, config: &ScanConfig) -> Vec<ForensicFinding> {
     let pids = match enumerate_all_pids() {
         Ok(pids) => pids,
         Err(_) => return Vec::new(),
@@ -74,7 +74,7 @@ pub fn sweep_host(reader: &DirectSyscallReader, config: &ScanConfig) -> Vec<Fore
 }
 
 /// Scan targets selected by `config`.
-pub fn scan_targets(reader: &DirectSyscallReader, config: &ScanConfig) -> Vec<ForensicFinding> {
+pub fn scan_targets(reader: &dyn ProcessMemoryReader, config: &ScanConfig) -> Vec<ForensicFinding> {
     cerberus_elf::disk::clear_cache();
     cerberus_elf::dynamic::clear_cache();
 

@@ -22,4 +22,9 @@ log.workspace = true
 rayon.workspace = true
 
 [dev-dependencies]
+criterion = "0.5"
 serde_json.workspace = true
+
+[[bench]]
+name = "scan_benchmark"
+harness = false
