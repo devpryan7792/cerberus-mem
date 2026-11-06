@@ -1,134 +1,106 @@
 <p align="center">
-  <img src="assets/banner.svg" alt="Cerberus-Mem — Linux in-memory forensics" width="100%">
+  <img src="assets/banner.svg" alt="Cerberus-Mem" width="100%">
 </p>
 
 <p align="center">
-  <a href="https://github.com/devpryan7792/cerberus-mem/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/devpryan7792/cerberus-mem/actions/workflows/ci.yml/badge.svg?branch=main&style=flat-square"></a>
-  <img alt="License" src="https://img.shields.io/badge/license-Apache--2.0-3b82f6?style=flat-square">
-  <img alt="Rust" src="https://img.shields.io/badge/rust-stable-orange?style=flat-square&logo=rust">
-  <img alt="Platform" src="https://img.shields.io/badge/platform-Linux%20x86__64%20%7C%20aarch64-0ea5e9?style=flat-square&logo=linux&logoColor=white">
-  <img alt="PRs welcome" src="https://img.shields.io/badge/PRs-welcome-22c55e?style=flat-square">
+  <a href="https://github.com/devpryan7792/cerberus-mem/actions/workflows/ci.yml"><img src="https://github.com/devpryan7792/cerberus-mem/actions/workflows/ci.yml/badge.svg?branch=main&style=flat-square" alt="CI"></a>
+  <a href="LICENSE"><img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=flat-square" alt="License"></a>
+  <a href="https://crates.io/crates/cerberus-cli"><img src="https://img.shields.io/badge/crates.io-cerberus--cli-orange?style=flat-square" alt="crates.io"></a>
+  <img src="https://img.shields.io/badge/linux-x86__64%20%7C%20aarch64-8b8b8b?style=flat-square" alt="Platform">
 </p>
 
 <p align="center">
-  <strong>Passive Linux memory forensics for code that never touches disk.</strong><br>
-  Differential ELF analysis · GOT/PLT integrity · inline hooks · fileless execution · W^X.
+  <b>Passive Linux memory forensics.</b> Compares live process memory against
+  on-disk ELF images, validates dynamic-linker state, and finds code that only
+  ever existed in RAM.
 </p>
 
 ---
 
-Cerberus-Mem inspects live Linux processes without pausing them. It compares
-each process's on-disk ELF image with its mapped memory, validates dynamic-linker
-data structures, and flags code that only exists in RAM. The engine uses
-`process_vm_readv(2)` with a `/proc/[pid]/mem` fallback — never `ptrace` — so
-targets keep running and anti-debug checks do not trip.
-
 ## Why
 
-`auditd` sees syscalls, not memory. On-disk scanners see files, not mapped pages.
-Both miss the modern Linux playbook: `memfd_create` + `fexecve`, overwritten
-`.text`, hooked GOT slots, and inline trampolines in libc.
+`auditd` records syscalls. On-disk scanners read files. Neither looks at the
+pages a running process actually has mapped — which is where `memfd_create`
+payloads, hollowed daemons, poisoned GOT slots, and hooked libc functions
+live.
 
-| Capability | auditd | On-disk AV | Cerberus-Mem |
-|---|:---:|:---:|:---:|
-| Code that exists only in RAM | ❌ | ❌ | ✅ |
-| Running `.text` vs disk divergence | ❌ | ❌ | ✅ |
-| GOT/PLT pointer validation | ❌ | ❌ | ✅ |
-| Inline hook trampolines | ❌ | ❌ | ✅ |
-| W^X and anonymous executable pages | ⚠️ | ❌ | ✅ |
+Cerberus-Mem reads a target's address space with `process_vm_readv(2)` (falling
+back to `/proc/[pid]/mem`) and never attaches with `ptrace`. The target keeps
+running and never sees the inspection.
 
-<sub>Capability comparison for default configurations, not a benchmark. `auditd` can be extended with custom rules, but it has no ELF- or VMA-aware integrity checks out of the box.</sub>
-
-## Demo
-
-<p align="center">
-  <img src="assets/demo.svg" alt="Cerberus-Mem scanning a live host and a synthetic lab target" width="100%">
-</p>
-
-<p align="center"><sub>Live host sweep, then a synthetic lab target combining a memfd payload, GOT hijack, and <code>.text</code> tampering.</sub></p>
-
-## Quick start
+## Install
 
 ```bash
 git clone https://github.com/devpryan7792/cerberus-mem.git
 cd cerberus-mem
-
 cargo build --release
+```
+
+```bash
+# or
+cargo install --git https://github.com/devpryan7792/cerberus-mem cerberus-cli --bin cerberus-mem --locked
+```
+
+Host-wide inspection needs `CAP_SYS_PTRACE`:
+
+```bash
 sudo setcap cap_sys_ptrace,cap_dac_read_search+ep target/release/cerberus-mem
-
-./target/release/cerberus-mem --all
 ```
 
-Or install it directly:
+Same-user targets work unprivileged under `ptrace_scope=0`.
+
+## Use
 
 ```bash
-cargo install --git https://github.com/devpryan7792/cerberus-mem \
-  cerberus-cli --bin cerberus-mem --locked
-sudo setcap cap_sys_ptrace,cap_dac_read_search+ep "$(command -v cerberus-mem)"
-```
-
-## Usage
-
-```bash
-cerberus-mem --pid 1234                                  # one process
-cerberus-mem --all                                       # full host sweep
-cerberus-mem --all --jsonl findings.jsonl                # JSON-Lines, append mode
-cerberus-mem --all --max-threads 4                       # bound CPU usage
+cerberus-mem --pid 1234                  # single process
+cerberus-mem --all                       # whole host
+cerberus-mem --all --jsonl out.jsonl     # JSON-Lines for SIEM ingestion
+cerberus-mem --all --max-threads 4       # cap CPU usage
 cerberus-mem --daemon --interval 30 \
-  --quarantine-dir /var/log/cerberus/dumps               # continuous sweep
+  --quarantine-dir /var/log/cerberus     # continuous sweep
 ```
 
-Findings are printed to stdout. `--jsonl` writes one JSON object per line for
-SIEM ingestion while keeping stdout quiet.
+<p align="center">
+  <img src="assets/demo.svg" alt="cerberus-mem output" width="100%">
+</p>
 
-Daemon mode caps the scanner at 4 worker threads so a continuous sweep leaves
-headroom for the host's own work; `--max-threads` overrides it.
+## Detections
 
-If YAMA or missing capabilities prevent inspection of foreign processes, the
-tool says so explicitly instead of silently returning fewer findings.
-
-## What it detects
-
-| Signal | Method | Severity |
+| Type | Method | Severity |
 |---|---|---|
-| **Fileless execution** | `/proc/[pid]/exe` resolves to `memfd:` or a deleted file | Critical |
-| **Process hollowing** | Relocation-masked SHA-256 of disk `.text` vs the live mapping; divergent bytes extracted | High |
-| **GOT/PLT poisoning** | Imported function slots must resolve inside the expected module's executable/PLT ranges | High |
-| **Inline hooks** | Decode exported prologues and resolve `JMP`/`CALL` targets into foreign mappings | High |
-| **W^X violations** | VMA is writable and executable at the same time | High |
-| **Anonymous executable pages** | Unbacked executable VMA, with an allowlist for known JIT runtimes | Medium / Critical |
+| `FilelessMemfdExecution` | `/proc/[pid]/exe` resolves to `memfd:` or a deleted file | Critical |
+| `ProcessHollowing` | Relocation-masked SHA-256 of disk `.text` vs live mapping | Critical |
+| `GotPltHijack` | Imported GOT slot resolves outside the expected module's PLT | Critical |
+| `InlineFunctionHook` | Exported prologue contains a `JMP`/`CALL` into a foreign mapping | High |
+| `WxorXViolation` | VMA is writable and executable simultaneously | High |
+| `AnonymousExecutableMapping` | Unbacked executable VMA, above 64 KiB without a JIT allowlist | Medium → Critical |
 
-Every finding carries a timestamp, PID, comm, command line, address range,
-backing detail, and optional disk/memory hashes and disassembly.
+Every finding carries a timestamp, PID, comm, argv, address range, backing
+detail, and — where applicable — disk and memory SHA-256 hashes, the divergent
+bytes, and a disassembly of the altered instructions.
 
-## How it works
+## Design notes
 
-```mermaid
-flowchart LR
-    P["/proc/[pid]/maps, status, auxv, exe"] --> S["Process snapshot"]
-    D["On-disk ELF (mmap)"] --> T[".text + relocations"]
-    S --> R["process_vm_readv / proc mem"]
-    R --> L["Live .text + GOT slots"]
-    T --> H["Relocation mask + SHA-256"]
-    L --> H
-    R --> V["GOT/PLT + prologue validation"]
-    H --> F["Findings"]
-    V --> F
-    F --> O["CLI · JSON-Lines · quarantine"]
-```
+**Relocation masking.** A PIE binary's `.text` is rewritten by `ld-linux` at
+load time. Hashing disk `.text` against memory without accounting for
+`.rela.dyn` and `.rela.plt` produces a 100% false-positive rate. The engine
+zeroes every relocation interval on both sides before comparing.
 
-- One metadata and VMA collection pass per PID, shared by every detector.
-- On-disk executables are memory-mapped, not copied into the heap, and each
-  binary is parsed once per sweep regardless of how many processes map it.
-- GOT slot reads are batched into 64 KiB windows.
-- Host sweeps run across a Rayon worker pool and finish in roughly 260 ms for
-  330+ processes.
-- Unreadable pages degrade to zero-filled reads without being counted as
-  transferred; `EPERM` retries through `/proc/[pid]/mem`.
-- Targets are probed for readability first, so an unprivileged sweep does not
-  parse large binaries it is not permitted to read.
-- A process that `execve`s mid-scan is detected and re-snapshotted, so a torn
-  address space is never reported as a threat.
+**Batched GOT reads.** GOT slots are clustered, so the engine sorts them and
+slurps contiguous 64 KiB windows instead of issuing one syscall per slot.
+
+**Snapshot consistency.** A process that calls `execve` mid-scan swaps its
+entire address space. Maps read before the `execve` and memory read after it
+describe different layouts, and mixing them invents threats that do not exist.
+The scanner detects the swap and re-snapshots.
+
+**Readability probe.** Unprivileged sweeps check whether a target is readable
+before parsing its on-disk binary, so a host full of inaccessible processes
+does not pay for ELF parsing it cannot use.
+
+**Single-flight parsing.** Twelve processes mapping one 150 MB browser
+executable should parse it once, not twelve times. Per-path locks give that
+without serializing unrelated binaries.
 
 ## Output
 
@@ -150,49 +122,37 @@ flowchart LR
 }
 ```
 
-Quarantined artifacts land in a `0700` directory. Files are created exclusively
-with mode `0600` and `O_NOFOLLOW | O_CREAT | O_EXCL`, so existing symlinks or
-files are never followed or overwritten.
+Quarantined artifacts land in a `0700` directory. Files are created with mode
+`0600` and `O_NOFOLLOW | O_CREAT | O_EXCL`, so an existing symlink is never
+followed and an existing file is never overwritten.
 
 ## Performance
 
-Measured on a 12-core x86_64 host with ~330 visible PIDs, release build:
+Release build, 12-core x86_64, ~330 processes:
 
-| Gate | Result | Target |
+| | Measured | Budget |
 |---|---|---|
-| Single-PID scan, p99 | **~105 µs** | < 1.5 ms |
-| Full host sweep | **~260 ms** | < 500 ms (scaled to PID count) |
+| Single-PID p99 | 105 µs | 1.5 ms |
+| Full host sweep | 260 ms | 500 ms |
+
+The sweep budget scales with PID count from the charter's 300-process/500 ms
+reference point, preserving the per-process allowance on larger hosts.
 
 ```bash
 cargo bench -p cerberus-cli
 cargo test -p cerberus-cli --release --test sla_test -- --ignored --nocapture
 ```
 
-The latency gate scans a spawned target process; the sweep gate is the best of
-three full `/proc` walks. The sweep budget scales with the number of visible
-processes using the charter's own 300-process/500 ms reference point, so a
-larger host gets proportionally more time while still enforcing the per-process
-allowance.
+## Layout
 
-## Permissions and safety
-
-- Host-wide inspection needs `CAP_SYS_PTRACE`; same-user targets can work
-  unprivileged when YAMA `ptrace_scope` permits it.
-- No `ptrace`, no process suspension, no code injection.
-- Kernel-space rootkits and a compromised `/proc` are out of scope.
-- This is a forensic inspection tool, not a sandbox. Use it only on systems you
-  own or are authorized to examine.
-
-## Project layout
-
-```text
+```
 crates/
-├── cerberus-core     # process_vm_readv + /proc/[pid]/mem readers, syscall ABI
+├── cerberus-core     # readers: process_vm_readv + /proc/[pid]/mem
 ├── cerberus-procfs   # maps, status, auxv, enumeration, YAMA, snapshot checks
 ├── cerberus-elf      # mmap-backed ELF, relocations, dynamic symbols, GOT/PLT
 ├── cerberus-detect   # fileless, hollowing, GOT, inline hook, W^X engines
 ├── cerberus-report   # finding models, JSON-Lines, secure quarantine
-└── cerberus-cli      # cerberus-mem binary, sweep orchestration, benchmarks
+└── cerberus-cli      # binary, sweep orchestration, benchmarks
 ```
 
 ## Testing
@@ -203,41 +163,28 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace -- --test-threads=1
 ```
 
-The suite runs real-kernel adversarial probes, not mocks: an actual
-`memfd_create` + `execveat` payload, in-memory `.text` tampering, a synthetic
-GOT hijack, clean-process false-positive checks, address-space snapshot
-consistency, and JSON-Lines emission.
+Adversarial tests use real kernel primitives, not mocks: a genuine
+`memfd_create` + `execveat` payload, live `.text` patching through
+`/proc/[pid]/mem`, and a synthetic GOT hijack.
 
-## Status and roadmap
+## Limits
 
-- [x] Passive `process_vm_readv` reader with `/proc/[pid]/mem` fallback
-- [x] Relocation-masked `.text` differential analysis
-- [x] GOT/PLT pointer verification
-- [x] Inline hook trampoline detection
-- [x] JSON-Lines output and secure quarantine
-- [x] Criterion benchmarks and p99/sweep SLA gates
-- [x] Torn-snapshot detection for processes that `execve` mid-scan
-- [x] Bounded scanner thread pool (`--max-threads`)
-- [ ] On-disk prologue comparison for inline hooks
-- [ ] Stack pivot detection
-- [ ] `cargo-fuzz`, proptest, and mutation testing in CI
-- [ ] Distro packages and signed releases
+- Byte-level differential analysis. Legitimate runtime self-modification is
+  handled by JIT allowlists, not by the hollowing engine.
+- `TextSegmentModification` and `StackPivoting` are schema types but are not
+  emitted yet.
+- Inline-hook detection validates jump destinations; it does not compare the
+  on-disk prologue byte-for-byte.
+- Kernel-space rootkits and a tampered `/proc` are out of scope.
 
 ## Documentation
 
-| Document | Contents |
-|---|---|
-| [`PROJECT_CHARTER.md`](PROJECT_CHARTER.md) | Threat model, scope, operational constraints |
-| [`ARCHITECTURE_SPEC.md`](ARCHITECTURE_SPEC.md) | Data structures, parsers, and detection algorithms |
-| [`PHASED_IMPLEMENTATION.md`](PHASED_IMPLEMENTATION.md) | Implementation contract and verification gates |
-| [`TESTING_AND_VERIFICATION.md`](TESTING_AND_VERIFICATION.md) | Test strategy and tooling |
-| [`ROADMAP.md`](ROADMAP.md) | Milestones and risk register |
-
-## Contributing
-
-Issues and pull requests are welcome. Before opening a PR, run the format,
-clippy, and test commands above; CI runs the same gates on every push.
+[`PROJECT_CHARTER.md`](PROJECT_CHARTER.md) ·
+[`ARCHITECTURE_SPEC.md`](ARCHITECTURE_SPEC.md) ·
+[`PHASED_IMPLEMENTATION.md`](PHASED_IMPLEMENTATION.md) ·
+[`TESTING_AND_VERIFICATION.md`](TESTING_AND_VERIFICATION.md) ·
+[`ROADMAP.md`](ROADMAP.md)
 
 ## License
 
-Apache-2.0. See [`LICENSE`](LICENSE).
+[Apache-2.0](LICENSE)
