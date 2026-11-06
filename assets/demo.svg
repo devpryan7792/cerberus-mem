@@ -37,7 +37,7 @@
 
     <text x="30" y="224" fill="#475569">...</text>
 
-    <text x="30" y="252" fill="#34d399">cerberus-mem: 229 finding(s) · 316 processes · 114 ms</text>
+    <text x="30" y="252" fill="#34d399">cerberus-mem: 229 finding(s) · 332 processes · 261 ms</text>
 
     <text x="30" y="300" fill="#22d3ee">$</text>
     <text x="48" y="300" fill="#e2e8f0">cerberus-mem --pid 4821 --jsonl findings.jsonl</text>

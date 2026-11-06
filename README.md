@@ -73,12 +73,19 @@ sudo setcap cap_sys_ptrace,cap_dac_read_search+ep "$(command -v cerberus-mem)"
 cerberus-mem --pid 1234                                  # one process
 cerberus-mem --all                                       # full host sweep
 cerberus-mem --all --jsonl findings.jsonl                # JSON-Lines, append mode
+cerberus-mem --all --max-threads 4                       # bound CPU usage
 cerberus-mem --daemon --interval 30 \
   --quarantine-dir /var/log/cerberus/dumps               # continuous sweep
 ```
 
 Findings are printed to stdout. `--jsonl` writes one JSON object per line for
 SIEM ingestion while keeping stdout quiet.
+
+Daemon mode caps the scanner at 4 worker threads so a continuous sweep leaves
+headroom for the host's own work; `--max-threads` overrides it.
+
+If YAMA or missing capabilities prevent inspection of foreign processes, the
+tool says so explicitly instead of silently returning fewer findings.
 
 ## What it detects
 
@@ -111,12 +118,17 @@ flowchart LR
 ```
 
 - One metadata and VMA collection pass per PID, shared by every detector.
-- On-disk executables are memory-mapped, not copied into the heap.
+- On-disk executables are memory-mapped, not copied into the heap, and each
+  binary is parsed once per sweep regardless of how many processes map it.
 - GOT slot reads are batched into 64 KiB windows.
-- Host sweeps run across a Rayon worker pool and finish in roughly 110 ms for
-  300+ processes.
+- Host sweeps run across a Rayon worker pool and finish in roughly 260 ms for
+  330+ processes.
 - Unreadable pages degrade to zero-filled reads without being counted as
   transferred; `EPERM` retries through `/proc/[pid]/mem`.
+- Targets are probed for readability first, so an unprivileged sweep does not
+  parse large binaries it is not permitted to read.
+- A process that `execve`s mid-scan is detected and re-snapshotted, so a torn
+  address space is never reported as a threat.
 
 ## Output
 
@@ -144,12 +156,12 @@ files are never followed or overwritten.
 
 ## Performance
 
-Measured on a 12-core x86_64 host with 316 visible PIDs, release build:
+Measured on a 12-core x86_64 host with ~330 visible PIDs, release build:
 
 | Gate | Result | Target |
 |---|---|---|
-| Single-PID scan, p99 | **~94 µs** | < 1.5 ms |
-| Full host sweep | **~112 ms** | < 500 ms |
+| Single-PID scan, p99 | **~105 µs** | < 1.5 ms |
+| Full host sweep | **~260 ms** | < 500 ms (scaled to PID count) |
 
 ```bash
 cargo bench -p cerberus-cli
@@ -157,7 +169,10 @@ cargo test -p cerberus-cli --release --test sla_test -- --ignored --nocapture
 ```
 
 The latency gate scans a spawned target process; the sweep gate is the best of
-three full `/proc` walks.
+three full `/proc` walks. The sweep budget scales with the number of visible
+processes using the charter's own 300-process/500 ms reference point, so a
+larger host gets proportionally more time while still enforcing the per-process
+allowance.
 
 ## Permissions and safety
 
@@ -173,7 +188,7 @@ three full `/proc` walks.
 ```text
 crates/
 ├── cerberus-core     # process_vm_readv + /proc/[pid]/mem readers, syscall ABI
-├── cerberus-procfs   # maps, status, auxv, process enumeration
+├── cerberus-procfs   # maps, status, auxv, enumeration, YAMA, snapshot checks
 ├── cerberus-elf      # mmap-backed ELF, relocations, dynamic symbols, GOT/PLT
 ├── cerberus-detect   # fileless, hollowing, GOT, inline hook, W^X engines
 ├── cerberus-report   # finding models, JSON-Lines, secure quarantine
@@ -190,7 +205,8 @@ cargo test --workspace -- --test-threads=1
 
 The suite runs real-kernel adversarial probes, not mocks: an actual
 `memfd_create` + `execveat` payload, in-memory `.text` tampering, a synthetic
-GOT hijack, clean-process false-positive checks, and JSON-Lines emission.
+GOT hijack, clean-process false-positive checks, address-space snapshot
+consistency, and JSON-Lines emission.
 
 ## Status and roadmap
 
@@ -200,6 +216,8 @@ GOT hijack, clean-process false-positive checks, and JSON-Lines emission.
 - [x] Inline hook trampoline detection
 - [x] JSON-Lines output and secure quarantine
 - [x] Criterion benchmarks and p99/sweep SLA gates
+- [x] Torn-snapshot detection for processes that `execve` mid-scan
+- [x] Bounded scanner thread pool (`--max-threads`)
 - [ ] On-disk prologue comparison for inline hooks
 - [ ] Stack pivot detection
 - [ ] `cargo-fuzz`, proptest, and mutation testing in CI
