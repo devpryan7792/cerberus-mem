@@ -151,11 +151,39 @@ pub fn load_dynamic_info(path: impl AsRef<Path>) -> Result<DynamicInfo, ElfError
 
 /// Process-wide cache of parsed dynamic linking metadata.
 static DYNAMIC_CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<DynamicInfo>>>> = OnceLock::new();
+/// Per-path load locks for dynamic metadata.
+static DYNAMIC_LOAD_LOCKS: OnceLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
+
+fn dynamic_load_lock(path: &Path) -> Arc<Mutex<()>> {
+    let locks = DYNAMIC_LOAD_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = locks
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    Arc::clone(
+        guard
+            .entry(path.to_path_buf())
+            .or_insert_with(|| Arc::new(Mutex::new(()))),
+    )
+}
 
 /// Load dynamic linking metadata, reusing a previously parsed copy when possible.
 pub fn load_dynamic_info_cached(path: impl AsRef<Path>) -> Result<Arc<DynamicInfo>, ElfError> {
     let path = path.as_ref();
     let cache = DYNAMIC_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+    {
+        let guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(info) = guard.get(path) {
+            return Ok(Arc::clone(info));
+        }
+    }
+
+    let load_lock = dynamic_load_lock(path);
+    let _loading = load_lock
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     {
         let guard = cache
@@ -178,6 +206,12 @@ pub fn load_dynamic_info_cached(path: impl AsRef<Path>) -> Result<Arc<DynamicInf
 pub fn clear_cache() {
     if let Some(cache) = DYNAMIC_CACHE.get() {
         let mut guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard.clear();
+    }
+    if let Some(locks) = DYNAMIC_LOAD_LOCKS.get() {
+        let mut guard = locks
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         guard.clear();

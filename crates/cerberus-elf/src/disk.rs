@@ -218,14 +218,44 @@ impl ElfDiskImage {
 
 /// Process-wide cache of parsed ELF images.
 static DISK_CACHE: OnceLock<Mutex<HashMap<PathBuf, Arc<ElfDiskImage>>>> = OnceLock::new();
+/// Per-path load locks: same executable parses once, different executables
+/// load in parallel.
+static DISK_LOAD_LOCKS: OnceLock<Mutex<HashMap<PathBuf, Arc<Mutex<()>>>>> = OnceLock::new();
+
+fn disk_load_lock(path: &Path) -> Arc<Mutex<()>> {
+    let locks = DISK_LOAD_LOCKS.get_or_init(|| Mutex::new(HashMap::new()));
+    let mut guard = locks
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+    Arc::clone(
+        guard
+            .entry(path.to_path_buf())
+            .or_insert_with(|| Arc::new(Mutex::new(()))),
+    )
+}
 
 /// Load an ELF image, reusing a previously parsed copy when possible.
 ///
 /// Many processes share the same executable inode; caching avoids repeatedly
-/// reading and parsing it during a host sweep.
+/// reading and parsing it during a host sweep. The per-path lock prevents a
+/// cache stampede when a dozen processes map the same large binary.
 pub fn load_cached(path: impl AsRef<Path>) -> Result<Arc<ElfDiskImage>, ElfError> {
     let path = path.as_ref();
     let cache = DISK_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+
+    {
+        let guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(image) = guard.get(path) {
+            return Ok(Arc::clone(image));
+        }
+    }
+
+    let load_lock = disk_load_lock(path);
+    let _loading = load_lock
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
 
     {
         let guard = cache
@@ -249,6 +279,12 @@ pub fn load_cached(path: impl AsRef<Path>) -> Result<Arc<ElfDiskImage>, ElfError
 pub fn clear_cache() {
     if let Some(cache) = DISK_CACHE.get() {
         let mut guard = cache
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        guard.clear();
+    }
+    if let Some(locks) = DISK_LOAD_LOCKS.get() {
+        let mut guard = locks
             .lock()
             .unwrap_or_else(|poisoned| poisoned.into_inner());
         guard.clear();
