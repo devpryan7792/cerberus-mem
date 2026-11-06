@@ -1,113 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="420" viewBox="0 0 1400 420" role="img" aria-label="Cerberus-Mem — Linux in-memory forensics">
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="380" viewBox="0 0 1400 380" role="img" aria-label="Cerberus-Mem — Linux in-memory forensics">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
-      <stop offset="0" stop-color="#07060f"/>
-      <stop offset="0.5" stop-color="#0b0a1c"/>
-      <stop offset="1" stop-color="#120b22"/>
+    <linearGradient id="rule" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0" stop-color="#4a7fd0"/>
+      <stop offset="1" stop-color="#d0574f"/>
     </linearGradient>
-
-    <!-- Korean wave palette: taegeuk red/blue, with hanbok accents -->
-    <linearGradient id="waveL" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#4cc9f0"/>
-      <stop offset="1" stop-color="#4895ef"/>
-    </linearGradient>
-    <linearGradient id="waveR" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ff5d8f"/>
-      <stop offset="1" stop-color="#ef476f"/>
-    </linearGradient>
-    <linearGradient id="title" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0" stop-color="#4cc9f0"/>
-      <stop offset="0.5" stop-color="#f72585"/>
-      <stop offset="1" stop-color="#ffb703"/>
-    </linearGradient>
-
-    <pattern id="grid" width="48" height="48" patternUnits="userSpaceOnUse">
-      <path d="M48 0H0V48" fill="none" stroke="#1b1836" stroke-width="1"/>
-    </pattern>
-
-    <filter id="glow" x="-60%" y="-60%" width="220%" height="220%">
-      <feGaussianBlur stdDeviation="6" result="b"/>
-      <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
-    </filter>
   </defs>
 
-  <rect width="1400" height="420" fill="url(#bg)"/>
-  <rect width="1400" height="420" fill="url(#grid)" opacity="0.7"/>
+  <rect width="1400" height="380" fill="#0a0a0f"/>
 
-  <!-- vignette behind the wordmark -->
-  <radialGradient id="vig" cx="0.5" cy="0.42" r="0.6">
-    <stop offset="0" stop-color="#4cc9f0" stop-opacity="0.07"/>
-    <stop offset="1" stop-color="#4cc9f0" stop-opacity="0"/>
-  </radialGradient>
-  <ellipse cx="700" cy="180" rx="520" ry="150" fill="url(#vig)"/>
+  <g fill="none" stroke-linecap="round">
+    <path d="M 0.00 150.00 C 42.00 150.00 98.00 104.00 140.00 104.00 C 182.00 104.00 238.00 150.00 280.00 150.00 C 322.00 150.00 378.00 104.00 420.00 104.00 C 462.00 104.00 518.00 150.00 560.00 150.00 C 602.00 150.00 658.00 104.00 700.00 104.00" stroke="#4a7fd0" stroke-width="7"/>
+    <path d="M 700.00 104.00 C 742.00 104.00 798.00 150.00 840.00 150.00 C 882.00 150.00 938.00 104.00 980.00 104.00 C 1022.00 104.00 1078.00 150.00 1120.00 150.00 C 1162.00 150.00 1218.00 104.00 1260.00 104.00 C 1302.00 104.00 1358.00 150.00 1400.00 150.00" stroke="#d0574f" stroke-width="7"/>
+  </g>
 
-  <!-- ===== the Korean wave: a crest line with figures waving along it ===== -->
-  <g transform="translate(0 96)">
-    <!-- wave ribbon: blue half then red half, meeting at the centre -->
-    <g fill="none" stroke-linecap="round" stroke-width="8" opacity="0.95" filter="url(#glow)">
-      <path d="M0 44 C 60 44, 80 -26, 140 -26 C 200 -26, 220 44, 280 44 C 340 44, 360 -26, 420 -26 C 480 -26, 500 44, 560 44 C 620 44, 640 -26, 700 -26" stroke="url(#waveL)"/>
-      <path d="M700 -26 C 760 -26, 780 44, 840 44 C 900 44, 920 -26, 980 -26 C 1040 -26, 1060 44, 1120 44 C 1180 44, 1200 -26, 1260 -26 C 1320 -26, 1340 44, 1400 44" stroke="url(#waveR)"/>
+  <g fill="none" stroke-linecap="round" opacity="0.16">
+    <path d="M 0.00 150.00 C 42.00 150.00 98.00 104.00 140.00 104.00 C 182.00 104.00 238.00 150.00 280.00 150.00 C 322.00 150.00 378.00 104.00 420.00 104.00 C 462.00 104.00 518.00 150.00 560.00 150.00 C 602.00 150.00 658.00 104.00 700.00 104.00" stroke="#4a7fd0" stroke-width="2" transform="translate(0 30)"/>
+    <path d="M 700.00 104.00 C 742.00 104.00 798.00 150.00 840.00 150.00 C 882.00 150.00 938.00 104.00 980.00 104.00 C 1022.00 104.00 1078.00 150.00 1120.00 150.00 C 1162.00 150.00 1218.00 104.00 1260.00 104.00 C 1302.00 104.00 1358.00 150.00 1400.00 150.00" stroke="#d0574f" stroke-width="2" transform="translate(0 30)"/>
+  </g>
+
+  <circle cx="700" cy="104.0" r="29" fill="#0a0a0f"/>
+  <circle cx="700" cy="104.0" r="21" fill="#4a7fd0"/>
+  <path d="M 700 83.0 A 21 21 0 0 1 700 125.0 A 10.5 10.5 0 0 1 700 104.0 A 10.5 10.5 0 0 0 700 83.0 Z" fill="#d0574f"/>
+
+  <g>
+    <g stroke="#4a7fd0" fill="#4a7fd0" stroke-linecap="round">
+      <circle cx="140.0" cy="68.0" r="7.5" stroke="none"/>
+      <path d="M 140.0 77.0 L 140.0 102.0" stroke-width="7" fill="none"/>
+      <path d="M 142.0 85.0 L 154.0 70.0" stroke-width="4" fill="none"/>
+      <path d="M 138.0 88.0 L 129.0 78.0" stroke-width="4" fill="none"/>
     </g>
-
-    <!-- figures standing on the crests, waving -->
-    <g>
-      <!-- left (blue) -->
-      <g stroke="#4cc9f0" stroke-width="4.5" stroke-linecap="round" fill="none">
-        <!-- body + waving arm -->
-        <path d="M140 -46 L140 -26"/>
-        <path d="M140 -40 L126 -52"/>
-        <path d="M420 -46 L420 -26"/>
-        <path d="M420 -40 L434 -52"/>
-        <path d="M700 -46 L700 -26" stroke="#7bdcff"/>
-        <path d="M700 -40 L686 -52" stroke="#7bdcff"/>
-      </g>
-      <g fill="#4cc9f0" filter="url(#glow)">
-        <circle cx="140" cy="-54" r="8"/>
-        <circle cx="420" cy="-54" r="8"/>
-      </g>
-      <circle cx="700" cy="-54" r="8" fill="#7bdcff" filter="url(#glow)"/>
-
-      <!-- right (red) -->
-      <g stroke="#ff5d8f" stroke-width="4.5" stroke-linecap="round" fill="none">
-        <path d="M980 -46 L980 -26"/>
-        <path d="M980 -40 L994 -52"/>
-        <path d="M1260 -46 L1260 -26"/>
-        <path d="M1260 -40 L1246 -52"/>
-      </g>
-      <g fill="#ff5d8f" filter="url(#glow)">
-        <circle cx="980" cy="-54" r="8"/>
-        <circle cx="1260" cy="-54" r="8"/>
-      </g>
+    <g stroke="#4a7fd0" fill="#4a7fd0" stroke-linecap="round">
+      <circle cx="420.0" cy="68.0" r="7.5" stroke="none"/>
+      <path d="M 420.0 77.0 L 420.0 102.0" stroke-width="7" fill="none"/>
+      <path d="M 418.0 85.0 L 406.0 70.0" stroke-width="4" fill="none"/>
+      <path d="M 422.0 88.0 L 431.0 78.0" stroke-width="4" fill="none"/>
     </g>
-
-    <!-- taegeuk at the meeting point -->
-    <g transform="translate(700 9)" filter="url(#glow)">
-      <circle r="19" fill="#4cc9f0"/>
-      <path d="M0 -19 A 19 19 0 0 1 0 19 A 9.5 9.5 0 0 1 0 0 A 9.5 9.5 0 0 0 0 -19 Z" fill="#ef476f"/>
+    <g stroke="#d0574f" fill="#d0574f" stroke-linecap="round">
+      <circle cx="980.0" cy="68.0" r="7.5" stroke="none"/>
+      <path d="M 980.0 77.0 L 980.0 102.0" stroke-width="7" fill="none"/>
+      <path d="M 982.0 85.0 L 994.0 70.0" stroke-width="4" fill="none"/>
+      <path d="M 978.0 88.0 L 969.0 78.0" stroke-width="4" fill="none"/>
+    </g>
+    <g stroke="#d0574f" fill="#d0574f" stroke-linecap="round">
+      <circle cx="1260.0" cy="68.0" r="7.5" stroke="none"/>
+      <path d="M 1260.0 77.0 L 1260.0 102.0" stroke-width="7" fill="none"/>
+      <path d="M 1258.0 85.0 L 1246.0 70.0" stroke-width="4" fill="none"/>
+      <path d="M 1262.0 88.0 L 1271.0 78.0" stroke-width="4" fill="none"/>
     </g>
   </g>
 
-  <!-- ===== wordmark ===== -->
-  <text x="700" y="196" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="13" letter-spacing="9" fill="#8b87b8">LINUX · IN-MEMORY · FORENSICS</text>
-  <text x="700" y="260" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="72" font-weight="700" letter-spacing="2" fill="url(#title)">CERBERUS-MEM</text>
+  <text x="700" y="200" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="12" letter-spacing="6.5" fill="#75758a">LINUX · IN-MEMORY · FORENSICS</text>
+  <text x="700" y="258" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="62" font-weight="700" letter-spacing="7" fill="#f0f0f4">CERBERUS-MEM</text>
+  <line x1="432" y1="278" x2="968" y2="278" stroke="url(#rule)" stroke-width="2"/>
+  <text x="700" y="308" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="19" fill="#a4a4b4">Find the code that only exists in memory.</text>
 
-  <text x="700" y="300" text-anchor="middle" font-family="Inter, 'Segoe UI', Helvetica, Arial, sans-serif" font-size="20" fill="#c9c6e8">Find the code that only exists in memory.</text>
-
-  <!-- capability row -->
-  <g font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" letter-spacing="1.4">
-    <rect x="326" y="322" width="112" height="27" rx="13.5" fill="#0f1230" stroke="#2f3a6b"/>
-    <text x="382" y="340" text-anchor="middle" fill="#4cc9f0">FILELESS</text>
-    <rect x="450" y="322" width="122" height="27" rx="13.5" fill="#0f1230" stroke="#2f3a6b"/>
-    <text x="511" y="340" text-anchor="middle" fill="#4cc9f0">HOLLOWING</text>
-    <rect x="584" y="322" width="92" height="27" rx="13.5" fill="#0f1230" stroke="#2f3a6b"/>
-    <text x="630" y="340" text-anchor="middle" fill="#4cc9f0">GOT/PLT</text>
-    <rect x="688" y="322" width="126" height="27" rx="13.5" fill="#0f1230" stroke="#4b2a52"/>
-    <text x="751" y="340" text-anchor="middle" fill="#ff5d8f">INLINE HOOKS</text>
-    <rect x="826" y="322" width="62" height="27" rx="13.5" fill="#0f1230" stroke="#4b2a52"/>
-    <text x="857" y="340" text-anchor="middle" fill="#ff5d8f">W^X</text>
-    <rect x="900" y="322" width="174" height="27" rx="13.5" fill="#0f1230" stroke="#4b2a52"/>
-    <text x="987" y="340" text-anchor="middle" fill="#ffb703">PASSIVE · NO PTRACE</text>
-  </g>
-
-  <line x1="326" y1="372" x2="1074" y2="372" stroke="#241f45" stroke-width="1"/>
+  <text x="700" y="342" text-anchor="middle" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace" font-size="11.5" letter-spacing="1.6" fill="#63637a">FILELESS · HOLLOWING · GOT/PLT · INLINE HOOKS · W^X · PASSIVE</text>
+  <line x1="432" y1="360" x2="968" y2="360" stroke="#23232e" stroke-width="1"/>
 </svg>
