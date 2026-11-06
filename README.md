@@ -36,8 +36,8 @@ Both miss the modern Linux playbook: `memfd_create` + `fexecve`, overwritten
 | GOT/PLT pointer validation | ❌ | ❌ | ✅ |
 | Inline hook trampolines | ❌ | ❌ | ✅ |
 | W^X and anonymous executable pages | ⚠️ | ❌ | ✅ |
-| Pauses or attaches to the target | — | — | No |
-| Typical per-process cost | event stream | file scan | ~94 µs p99 |
+
+<sub>Capability comparison for default configurations, not a benchmark. `auditd` can be extended with custom rules, but it has no ELF- or VMA-aware integrity checks out of the box.</sub>
 
 ## Demo
 
